@@ -4,6 +4,21 @@
   "description": "A queen/bee runtime for agent cells and actions.",
   "license": "Apache-2.0",
   "type": "module",
+  "homepage": "https://syntropy-systems-oss.github.io/skep/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/syntropy-systems-oss/skep.git"
+  },
+  "bugs": {
+    "url": "https://github.com/syntropy-systems-oss/skep/issues"
+  },
+  "keywords": [
+    "agent",
+    "agents",
+    "llm",
+    "agent-framework",
+    "ai"
+  ],
   "engines": {
     "node": ">=20"
   },

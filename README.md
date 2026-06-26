@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./assets/logo-dark.svg">
-    <img alt="Skep" src="./assets/logo-light.svg" width="120" height="120">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/syntropy-systems-oss/skep/main/assets/logo-dark.png">
+    <img alt="Skep" src="https://raw.githubusercontent.com/syntropy-systems-oss/skep/main/assets/logo-light.png" width="120" height="120">
   </picture>
 </p>
 
