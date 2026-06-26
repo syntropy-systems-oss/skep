@@ -26,10 +26,18 @@ is headed, not a promise. Ideas graduate from a note here into a release when th
 - **Parallelism — `many()` / async bees.** Fire bees and keep going instead of blocking on
   each. Needs: a **sleep/poll** primitive (nap until a bee returns or time expires, then
   decide), and **layered budgets** — a global bee budget *and* a per-bee max-concurrent.
-- **Bees-per-cell capacity.** A cell caps how many bees it holds at once. `file` cell = 1 → no
-  two agents clobber the same file. This is the World-Isolation Law made *local* — a
-  decentralized concurrency guard with no global state. A bee arriving at a full/occupied cell
-  sees the resident's goals; a conflict can be flagged.
+- **Bees-per-cell capacity + stigmergy.** A cell caps how many bees it holds at once. `file`
+  cell = 1 → no two agents clobber the same file. This is the World-Isolation Law made *local*
+  — a decentralized concurrency guard with no global state. Co-located bees coordinate
+  *through the cell* (stigmergy — the room is the shared medium, the way real bees use the
+  comb), never a global blackboard; the capacity cap is what keeps that bounded. A bee
+  arriving at an occupied cell sees the resident's goals; conflicts flag and bubble up.
+- **Persistent bees.** A second lifecycle alongside transient task bees (spawn → resolve →
+  die): long-lived, ambient bees that patrol the hive — the natural home for the meta-layer
+  (immune watcher, learning curator, the cell-rewriting meta-bee). They may roam between cells,
+  *if* they carry a distilled gist (mission + pollen), not an accumulating transcript — that's
+  what keeps roaming on the space side, not the time side. Makes lifecycle + resource budgets
+  load-bearing (a persistent bee is a daemon).
 - **Conflict bubbling.** When sibling bees collide (same cell, contradictory work), the
   conflict surfaces to their **lowest common ancestor**, which decides and sends a resolution
   back down. The tree gives you the coordination point for free.
@@ -70,6 +78,15 @@ Real bees can replace the queen. Apply it to safety:
 - The system improving over time, not just agents orchestrating agents. Define the **degrees of
   freedom** (what the meta-process may change: descriptions, renderers, cell structure, goals).
 
+### Specialized & RL-trained bee models
+The mind is already per-bee, so a bee can run a small task-specialized or RL-tuned model while
+its siblings run a general one. The plumbing exists; the research is the training loop and the
+data (combs make good trajectories).
+
+### Policy everywhere
+Generalize lock/key + run-context governance into a policy seam at *every* boundary — spawn,
+action, cell entry. The spawn attenuation check is the first instance of a much larger surface.
+
 ## North star — the growing, self-organizing hive
 
 The horizon everything points at. Deliberately unshaped — this needs experimentation, not a spec.
@@ -79,8 +96,13 @@ The horizon everything points at. Deliberately unshaped — this needs experimen
   the cell file format is consistent and agent-authorable (the thing we built in 0.1.0). A cell
   is just dependency-free TypeScript; a growing functional space — deterministic code around
   tool/MCP results, each cell its own little application.
-- **Bootstrap by intent.** Install → onboarding → "let's build your hive" → you state what you
-  want, it lays out the structure from best practices and keeps rearranging it.
+- **The starter hive — grow from usage, not configuration.** Onboarding isn't a config
+  wizard; you just *use* the system and it grows around your workflow and requests. **Drop-in
+  hives** are seeds: a starter, a *coder* hive whose bees swarm the codebase and build a
+  knowledge base, etc.
+- **The meta-hive.** How the hive grows should itself be a shapeable, growing abstraction — not
+  a sealed mechanism. Persistent meta-bees in meta-cells you can reach in and edit; bees that
+  tend bees, and you can rewrite the tending. The growth loop is recursive.
 - **Why it's even possible: space, not time.** You can rearrange, add, remove, and combine
   *space*; you can't rearrange a transcript. The thesis pays off hardest up here.
 - Hard part (the reason it's not today): the primitive of "what *is* a new cell" — codegen +
@@ -96,6 +118,9 @@ The reason this list is shorter than it looks — most of the vision rides on a 
   (growing hive, meta-bee)
 - **Comb serialization** → restore, replay, rewind, quarantine. (learning, immune system)
 - **World isolation (sandbox/worktree)** → safe parallel writers and clean replay.
+- **Per-bee minds** → specialized / RL-trained bees, and meta-bees with their own brains.
+- **Stigmergy through cells (not a global blackboard)** → bee-to-bee coordination that stays
+  local and bounded.
 - **Space, not time** → all of it.
 
 ## Infra
