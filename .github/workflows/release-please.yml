@@ -13,8 +13,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # When a release is cut, title it with its bee codename from codenames.json.
+      - name: Name the release
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ steps.release.outputs.version }}"
+          tag="${{ steps.release.outputs.tag_name }}"
+          name=$(node -e "try{process.stdout.write((require('./codenames.json')['$version'])||'')}catch{process.stdout.write('')}")
+          if [ -n "$name" ]; then
+            echo "Naming $tag → \"$name\""
+            gh release edit "$tag" --title "$tag — $name"
+          else
+            echo "No codename for $version in codenames.json (skipping)."
+          fi
+
       # Publishing to npm is intentionally NOT wired up yet. When ready to ship, add a
-      # step gated on `steps.<id>.outputs.release_created` that runs `npm publish`.
+      # step gated on steps.release.outputs.release_created that runs `npm publish`.

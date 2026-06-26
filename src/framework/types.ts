@@ -1,3 +1,5 @@
+import type { Markup } from "./markup.ts";
+
 // The result a bee returns — the only value that crosses a bee boundary.
 export type GoalOutcome = "succeeded" | "partial" | "not_found" | "blocked" | "failed";
 
@@ -13,12 +15,12 @@ export interface LogEntry {
 
 export type BeeStatus = "open" | "resolved";
 
-// The one actor. A queen, a scout, a worker — all of these are bees; the only
-// difference is the capabilities they carry and the mind that drives them.
+// The one actor. A queen, a scout, a worker — all bees; they differ only in the keys
+// they carry and the mind that drives them.
 export interface Bee {
   id: string;
   goal: string;
-  capabilities: string[];
+  keys: string[]; // the locks this bee can open
   mind: Mind;
   status: BeeStatus;
   localLog: LogEntry[];
@@ -26,15 +28,13 @@ export interface Bee {
   children: Bee[];
 }
 
-// A comb is what a run weaves: the root bee (the queen) and her tree.
+// A comb is what a run weaves: the queen (root bee) and her tree.
 export interface Comb {
   queen: Bee;
   result: GoalResult;
   budgetUsed: number;
 }
 
-// What a bee can see when it decides: its ancestors' goals (the lexical contract),
-// its own goal, the results its children returned, and its own local history.
 export interface BeeView {
   ancestorGoals: string[];
   goal: string;
@@ -42,43 +42,32 @@ export interface BeeView {
   localLog: LogEntry[];
 }
 
-import type { Markup } from "./markup.ts";
-
-// Cell / action authoring.
+// Authoring: cells, actions, and the input schema.
 export type MaybePromise<T> = T | Promise<T>;
-
-// What a cell renders: structured Markup (from `xml`) or a plain string.
 export type Content = Markup | string;
 
-export type InputKind = "string" | "number" | "boolean";
+export type FieldType = "string" | "number" | "boolean";
 
-export interface InputField {
-  name: string;
-  type: InputKind;
-  description?: string;
-  required?: boolean;
+// A declared input field. `required` is carried in the type so `ArgsOf` can make
+// optional fields optional in the handler's args.
+export interface Field<T = unknown, R extends boolean = boolean> {
+  type: FieldType;
+  describe?: string;
+  required: R;
+  readonly _t?: T;
 }
 
-export interface ActionSpec {
-  name: string;
-  description: string;
-  requires?: string[]; // capabilities a bee must carry to see this action
-  input?: InputField[];
-}
+export type InputSchema = Record<string, Field>;
 
-export interface ActionView extends ActionSpec {
-  available: boolean;
-  unavailableReason?: string;
-  example: Record<string, unknown>;
-}
+// The handler's args, derived from the input schema: required fields are present,
+// optional fields are optional, and each value has the field's declared type.
+export type ArgsOf<I extends InputSchema> = Prettify<
+  { [K in keyof I as I[K] extends { required: true } ? K : never]: I[K] extends Field<infer T, any> ? T : never } & {
+    [K in keyof I as I[K] extends { required: false } ? K : never]?: I[K] extends Field<infer T, any> ? T : never;
+  }
+>;
 
-export type Availability = boolean | string;
-
-export interface SpawnOptions {
-  as?: string; // a bee-type preset name (resolved against the skep's bee types)
-  capabilities?: string[]; // explicit capabilities, overrides `as`
-  mind?: Mind; // give the child a different mind (e.g. a different model)
-}
+type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
 export interface ActionContext<S> {
   bee: Bee;
@@ -90,29 +79,44 @@ export interface ActionContext<S> {
   fail(message: string): never;
 }
 
-export interface ActionDefinition<S = unknown> extends ActionSpec {
-  available?: (ctx: { bee: Bee; state: S }) => MaybePromise<Availability>;
-  run(args: Record<string, unknown>, ctx: ActionContext<S>): MaybePromise<void>;
+export type Availability = boolean | string;
+
+export interface SpawnOptions {
+  as?: string; // a bee-type preset name, resolved against the skep's beeTypes
+  keys?: string[]; // explicit keys, overrides `as`
+  mind?: Mind; // give the child a different mind (e.g. a different model)
 }
 
+// An action: an affordance of a cell. `locks` are the keys a bee must carry to see it
+// (AND — every lock). `input` is a schema; `run`'s args are inferred from it.
+export interface Action<S = unknown, I extends InputSchema = InputSchema> {
+  describe: string;
+  locks?: string[];
+  input?: I;
+  available?: (ctx: { bee: Bee; state: S }) => MaybePromise<Availability>;
+  run(args: ArgsOf<I>, ctx: ActionContext<S>): MaybePromise<void>;
+}
+
+export type Does<S> = Record<string, Action<S, any>>;
+
+// A cell is a room: enter it (set up state), show it (render), and do things in it.
 export interface Cell<S = unknown, I = unknown> {
   id: string;
-  description?: string;
-  setup(input: I): MaybePromise<S>;
-  content(state: S): Content;
-  actions(ctx: { bee: Bee; state: S }): MaybePromise<ActionDefinition<S>[]>;
+  describe?: string;
+  enter(input: I): MaybePromise<S>;
+  show(state: S): Content;
+  does: Does<S> | ((ctx: { bee: Bee; state: S }) => MaybePromise<Does<S>>);
 }
 
 export interface CellRegistration<S = unknown, I = unknown> {
   id: string;
   cell: Cell<S, I>;
   input: I;
-  description?: string;
+  describe?: string;
   as?: string; // default bee-type for bees dispatched into this cell
 }
 
-// The mind — the one model seam. A bee decides; everything it "authors" (a child's
-// goal, its own result) is just arguments of the action it decides to take.
+// The mind — the one model seam (a policy: observation → action).
 export interface Decision {
   action: string;
   args: Record<string, unknown>;
@@ -120,7 +124,7 @@ export interface Decision {
 
 export interface DecideContext {
   bee: Bee;
-  view: string; // the rendered cell the bee is looking at
+  view: string;
   actions: ActionView[];
 }
 
@@ -128,11 +132,28 @@ export interface Mind {
   decide(ctx: DecideContext): Promise<Decision>;
 }
 
-// The interface: how a bee's view becomes the text its mind reads. This is the
-// single most important variable to experiment on — so it's swappable.
+// Normalized, model-facing view of an action (renderers and minds see this, not the
+// authoring shape). `input` is flattened to a list for rendering and arg coercion.
+export interface InputField {
+  name: string;
+  type: FieldType;
+  describe?: string;
+  required: boolean;
+}
+
+export interface ActionView {
+  name: string;
+  describe: string;
+  locks: string[];
+  input: InputField[];
+  available: boolean;
+  unavailableReason?: string;
+  example: Record<string, unknown>;
+}
+
 export type Renderer = (view: BeeView, content: Content, actions: ActionView[]) => string;
 
-// Run observability — the intrinsic lifecycle, nothing more.
+// Run observability — the intrinsic lifecycle.
 export type RunEvent =
   | { type: "enter"; bee: Bee; cell: string; depth: number }
   | { type: "view"; bee: Bee; cell: string; depth: number; view: string }

@@ -1,0 +1,101 @@
+# Skep — guide for agents
+
+You are likely an LLM about to build or edit a **cell**. Read this first; it will save you
+from writing the wrong kind of code.
+
+## 1. Shift your mental model: time → space
+
+Most agents live in **time**: one ever-growing transcript, memory as a log that only grows.
+Skep does not work that way. A skep run is a walk through a **state machine**, not a transcript.
+
+- A **cell** is a state — a room that renders content and offers actions.
+- A **bee** stands in one cell. It sees only: the cell, its own goal, its ancestors' goals,
+  and the results its child bees returned. **Not the whole history.**
+- To go further, a bee does not append to a log — it **spawns** a child bee into another
+  cell with a self-contained goal.
+- A bee finishes by **resolving** with a result (`outcome` + `summary`). Only the result
+  crosses the boundary; the detail stays in the cell.
+- The **queen** is the first bee. A run weaves a **comb** — the tree of bees.
+
+Do not try to reconstruct a transcript or hold global state. Hold a small local view and move.
+
+## 2. Writing a cell (best practice)
+
+**One cell per file**, laid out in this fixed order so each concern is edited on its own:
+
+```
+imports
+── state ──    the state type + `enter` (input → state)
+── show ──     `show(state)` → xml`…`   (content is XML — write XML)
+── does ──     the action cards
+── assembly ── export const x = cell("id", { enter, show, does })
+```
+
+```ts
+import { cell, cellKit, text, xml, type Cell } from "@syntropy-systems/skep";
+
+type Mailbox = { name: string; results: Email[] };
+const k = cellKit<Mailbox>();            // binds ctx.state to Mailbox in every handler
+
+// ── state ──
+const enter = ({ name }: { name: string }): Mailbox => ({ name, results: [] });
+
+// ── show ──
+const show = (s: Mailbox) => xml`
+  <mailbox name="${s.name}">
+    ${s.results.map((e) => xml`<email id="${e.id}" subject="${e.subject}" />`)}
+  </mailbox>
+`;
+
+// ── does ──
+const search = k.action({
+  describe: "Search this mailbox.",         // the model reads this to choose the action
+  input: { query: text("search query") },   // declare the shape; run's args are typed from it
+  run: ({ query }, ctx) => {                 // query: string — inferred, no parsing
+    ctx.update({ results: searchMailbox(query) });
+    ctx.observe(`found ${ctx.state.results.length} emails`);
+  },
+});
+
+const archive = k.action({
+  describe: "Archive a message.",
+  locks: ["write"],                          // a bee sees this only if it carries the write key
+  input: { id: text("email id") },
+  run: ({ id }, ctx) => archiveEmail(id),
+});
+
+const open = k.action({
+  describe: "Send a bee into a message to read it.",
+  input: { id: text("email id"), goal: text("goal for the bee you send") },
+  run: async ({ id, goal }, ctx) => {
+    const r = await ctx.spawn(message, { id }, goal);   // `message` is another cell
+    ctx.observe(`reader returned [${r.outcome}] ${r.summary}`);
+  },
+});
+
+// ── assembly ──
+export const mailbox = cell<Mailbox, { name: string }>("mailbox", {
+  enter,
+  show,
+  does: { search, archive, open },
+});
+```
+
+## 3. Rules
+
+- **Content is XML.** `xml` escapes interpolated values by default; nested `xml` passes
+  through; use `raw()` to inject trusted markup.
+- **Input fields** are declared, not parsed: `text(desc)`, `num(desc)`, `flag(desc)`, and
+  `optional(field)`. The handler's args are typed from the schema.
+- **Locks are AND.** `locks: ["write", "audit"]` means a bee needs a key for *every* lock.
+  Bees carry `keys`. Presets: `scout → ["read"]`, `worker → ["read", "write"]`.
+- **Never write a `resolve` action** — the runtime injects it. To finish, call `resolve`
+  with `{ outcome, summary }` (a cell that defines its own `resolve` is rejected).
+- **The only `ctx` verbs:** `ctx.state`, `ctx.update(patch)`, `ctx.observe(text)`,
+  `ctx.spawn(cell, input, goal, opts?)`, `ctx.resolve(result)`, `ctx.fail(message)`.
+- **Keep handlers small.** Push real logic into helper functions. One room, one file.
+
+## 4. Verify
+
+After writing a cell, run `npm run verify`. The types are the guardrail — a malformed cell
+does not compile. If `tsc` complains, fix the cell; don't reach for `any`.

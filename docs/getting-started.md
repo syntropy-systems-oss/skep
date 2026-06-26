@@ -14,29 +14,33 @@ dependencies.
 A run needs three things: **cells** to work in, a **mind** to decide, and a **prompt**.
 
 ```ts
-import { skep, registerCell, cell, action, stringInput, xml } from "@syntropy-systems/skep";
+import { skep, registerCell, cell, cellKit, text, xml } from "@syntropy-systems/skep";
 import { llmMind } from "@syntropy-systems/skep/agents/llm";
 
-// A cell: a room that renders content and offers actions.
-const notes = cell("notes", {
-  description: "A scratch space of short notes.",
-  setup: ({ items }: { items: string[] }) => ({ items }),
-  content: (state) => xml`
-    <notes>
-      ${state.items.map((n, i) => xml`<note id="${i}">${n}</note>`)}
-    </notes>
-  `,
-  actions: () => [
-    action("add", {
-      description: "Append a note.",
-      requires: ["write"],
-      input: [stringInput("text", "Note text")],
-    }, async ({ text }, ctx) => {
-      ctx.update((s) => ({ items: [...s.items, String(text)] }));
-      ctx.observe(`Added: ${text}`);
-    }),
-  ],
+type Notes = { items: string[] };
+const k = cellKit<Notes>();
+
+// ── state ──
+const enter = ({ items }: { items: string[] }): Notes => ({ items });
+
+// ── show ──
+const show = (s: Notes) => xml`
+  <notes>${s.items.map((n, i) => xml`<note id="${i}">${n}</note>`)}</notes>
+`;
+
+// ── does ──
+const add = k.action({
+  describe: "Append a note.",
+  locks: ["write"],                       // only a bee carrying the write key sees this
+  input: { note: text("note text") },
+  run: ({ note }, ctx) => {               // note: string
+    ctx.update((s) => ({ items: [...s.items, note] }));
+    ctx.observe(`added: ${note}`);
+  },
 });
+
+// ── assembly ──
+const notes = cell<Notes, { items: string[] }>("notes", { enter, show, does: { add } });
 
 const hive = skep({
   cells: [registerCell(notes, { items: ["buy honey"] }, { as: "worker" })],
@@ -47,9 +51,10 @@ const comb = await hive.run("Add a note reminding me to refill the feeder.");
 console.log(comb.result.outcome, "—", comb.result.summary);
 ```
 
-A bee never sees a write action unless it carries the `write` capability — here the cell is
-registered `as: "worker"` (read + write). A `scout` (read only) would see `notes` but not
-`add`. The `resolve` action is injected automatically, so the bee can always finish.
+A bee never sees the `add` action unless it carries the `write` key — here the cell is
+registered `as: "worker"` (holds `read` + `write`). A `scout` (only `read`) would see the
+`notes` cell but not `add`. The `resolve` action is injected automatically, so the bee can
+always finish.
 
 ## Pointing at a model
 

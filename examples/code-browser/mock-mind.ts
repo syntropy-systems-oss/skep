@@ -20,14 +20,14 @@ export function mockMind(): Mind {
 
       // Folder cell.
       if (has("grep")) {
-        if (bee.localLog.length === 0) return { action: "grep", args: { text: "IconAffiliate" } };
+        if (bee.localLog.length === 0) return { action: "grep", args: { query: "IconAffiliate" } };
         if (bee.children.length === 0) return { action: "open_file", args: { target: "src/menu-items/dashboard.js", goal: FILE_GOAL } };
         return { action: "resolve", args: { outcome: "succeeded", summary: ANSWER } };
       }
 
       // File cell.
       if (has("search")) {
-        if (bee.localLog.length === 0) return { action: "search", args: { text: "IconAffiliate" } };
+        if (bee.localLog.length === 0) return { action: "search", args: { query: "IconAffiliate" } };
         return { action: "resolve", args: { outcome: "succeeded", summary: ANSWER } };
       }
 

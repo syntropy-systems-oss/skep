@@ -25,7 +25,8 @@ export interface Skep {
 export function skep(config: SkepConfig): Skep {
   const renderer = config.renderer ?? tuiRenderer;
   const beeTypes = config.beeTypes ?? DEFAULT_BEE_TYPES;
-  const queenCapabilities = [...new Set(Object.values(beeTypes).flat())];
+  // The queen carries every key, so she can dispatch into any registered cell.
+  const queenKeys = [...new Set(Object.values(beeTypes).flat())];
 
   return {
     async run(prompt, opts = {}) {
@@ -39,7 +40,7 @@ export function skep(config: SkepConfig): Skep {
         onEvent: opts.onEvent,
       };
 
-      const queen = makeBee(prompt, queenCapabilities, config.mind);
+      const queen = makeBee(prompt, queenKeys, config.mind);
       const result = await runBee(queen, entryCell(), { cells: config.cells }, [], env);
 
       return { queen, result, budgetUsed: budget ? total - budget.remaining : 0 };

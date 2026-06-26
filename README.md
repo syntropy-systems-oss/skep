@@ -9,15 +9,15 @@
 
 Skep is a small framework for agent runs built from one idea: **everything is a bee.**
 
-A bee carries a *goal*, a *mind* (what it decides with), and a set of *capabilities*. It
+A bee carries a *goal*, a *mind* (what it decides with), and a set of *keys*. It
 enters a **cell** — a reusable room that renders content and offers actions — looks at
 what it sees, and acts. It can send child bees into other cells with their own goals, and
 it finishes by resolving with a result. The first bee is the **queen**; she orchestrates.
 A run weaves a **comb**: the queen and her tree of bees.
 
 That's the whole model. A scout, a worker, the queen — all bees; the only difference is
-the capabilities they carry and the mind that drives them. There is one model seam (the
-mind decides), one permission gate (capabilities), and one thing that crosses a bee
+the keys they carry and the mind that drives them. There is one model seam (the
+mind decides), one permission gate (locks & keys), and one thing that crosses a bee
 boundary (its result).
 
 The package has **zero runtime dependencies.**
@@ -30,67 +30,69 @@ npm install @syntropy-systems/skep
 
 ## Authoring cells
 
-A cell is a room: it renders content and offers actions. Actions declare what capability
-they require; a bee only sees an action if it carries that capability. You never write a
-`resolve` action — the runtime injects one into every cell. Values interpolated with `xml`
-are escaped by default; nested `xml` fragments pass through untouched, and `raw()` injects
-trusted markup verbatim.
+A cell is a room: `enter` it (set up state), `show` it (render), and `does` (its
+affordances). One cell per file, laid out so each concern is edited on its own — state,
+then show, then the action cards, then the assembly. You never write a `resolve` action —
+the runtime injects one into every cell. Values interpolated with `xml` are escaped by
+default; nested `xml` passes through, and `raw()` injects trusted markup.
 
-"Opening" something is never special-cased — it's just sending a bee into another cell.
-Here a mailbox cell opens individual messages, and a **message is its own cell**:
+Each action declares `locks` (the keys a bee must carry to see it — every lock) and an
+`input` schema; the handler's args are **typed from that schema**, no parsing. "Opening"
+something is never special-cased — it's just `ctx.spawn` into another cell, so a **message
+is its own cell**:
 
 ```ts
-import { action, cell, stringInput, xml } from "@syntropy-systems/skep";
+import { cell, cellKit, text, xml } from "@syntropy-systems/skep";
 
-// A message is a cell too — a room a bee enters to read one email.
-const message = cell("message", {
-  description: "Read a single email message.",
-  setup: ({ id }: { id: string }) => ({ id, email: loadEmail(id) }),
-  content: (state) => xml`
-    <message id="${state.id}" from="${state.email.from}" subject="${state.email.subject}">
-      ${state.email.body}
-    </message>
-  `,
-  actions: () => [],                             // nothing to do but read, then resolve
+type Mailbox = { name: string; results: Email[] };
+const k = cellKit<Mailbox>();              // binds ctx.state to Mailbox in every handler
+
+// ── state ──
+const enter = ({ name }: { name: string }): Mailbox => ({ name, results: [] });
+
+// ── show ──
+const show = (s: Mailbox) => xml`
+  <mailbox name="${s.name}">
+    ${s.results.map((e) => xml`<email id="${e.id}" subject="${e.subject}" />`)}
+  </mailbox>
+`;
+
+// ── does ──
+const search = k.action({
+  describe: "Search this mailbox.",
+  input: { query: text("search query") },  // declare the shape → run's args are typed
+  run: ({ query }, ctx) => {               // query: string
+    ctx.update({ results: searchMailbox(query) });
+    ctx.observe(`found ${ctx.state.results.length} emails`);
+  },
 });
 
-const mailbox = cell("mailbox", {
-  description: "Search a mailbox and open individual messages.",
-  setup: ({ name }: { name: string }) => ({ name, results: [] as Email[] }),
-  content: (state) => xml`
-    <mailbox name="${state.name}">
-      ${state.results.map((email) => xml`<email id="${email.id}" subject="${email.subject}" />`)}
-    </mailbox>
-  `,
-  actions: () => [
-    action("search", {
-      description: "Search this mailbox.",
-      input: [stringInput("query", "Search query")],
-    }, async ({ query }, ctx) => {
-      const results = await searchMailbox(String(query));
-      ctx.update({ results });
-      ctx.observe(`Found ${results.length} emails.`);
-    }),
+const archive = k.action({
+  describe: "Archive a message.",
+  locks: ["write"],                        // a bee sees this only if it carries the write key
+  input: { id: text("email id") },
+  run: ({ id }, ctx) => archiveEmail(id),
+});
 
-    action("archive", {
-      description: "Archive a message.",
-      requires: ["write"],                       // only a bee carrying "write" sees this
-      input: [stringInput("id", "Email id")],
-    }, async ({ id }, ctx) => {
-      await archive(String(id));
-      ctx.observe(`Archived ${id}.`);
-    }),
+const open = k.action({
+  describe: "Send a bee into a message to read it.",
+  input: { id: text("email id"), goal: text("goal for the bee you send") },
+  run: async ({ id, goal }, ctx) => {
+    const r = await ctx.spawn(message, { id }, goal);   // `message` is another cell
+    ctx.observe(`reader returned [${r.outcome}] ${r.summary}`);
+  },
+});
 
-    action("open", {
-      description: "Send a bee into a message to read it.",
-      input: [stringInput("id", "Email id"), stringInput("goal", "Goal for the bee you send")],
-    }, async ({ id, goal }, ctx) => {
-      const result = await ctx.spawn(message, { id: String(id) }, String(goal));
-      ctx.observe(`Reader returned [${result.outcome}] ${result.summary}`);
-    }),
-  ],
+// ── assembly ──
+export const mailbox = cell<Mailbox, { name: string }>("mailbox", {
+  enter,
+  show,
+  does: { search, archive, open },
 });
 ```
+
+Agents will write cells too — so the shape *is* the prompt. The full authoring guide ships
+in the package as [`llms.txt`](./llms.txt).
 
 ## Running a skep
 
@@ -118,7 +120,7 @@ comb.queen.children;    // the tree of bees
 
 `run` generates the queen's entry cell automatically: it lists the registered cells and
 lets her `dispatch` a bee into one with a self-contained goal. `scout` and `worker` are
-just capability presets — `scout → ["read"]`, `worker → ["read", "write"]` — and you can
+just key presets — `scout → ["read"]`, `worker → ["read", "write"]` — and you can
 define your own via `beeTypes`.
 
 ## The mind
@@ -184,7 +186,7 @@ OPENAI_BASE_URL=https://api.openai.com/v1 OPENAI_API_KEY=sk-... SKEP_MODEL=gpt-4
 ## Security & sandboxing
 
 The runtime executes whatever its cells expose — filesystem, shell, network — with **no
-built-in permission system beyond capability-gated actions.** When you run an agent
+built-in permission system beyond lock-and-key actions.** When you run an agent
 against untrusted input or in an autonomous loop, the *process boundary* is your security
 boundary. The included `Dockerfile` shows a locked-down pattern (`--cap-drop ALL`,
 `--read-only`, `--security-opt no-new-privileges`, no docker socket). See

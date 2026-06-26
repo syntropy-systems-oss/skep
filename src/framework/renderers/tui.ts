@@ -28,7 +28,7 @@ export const tuiRenderer: Renderer = (view, content, actions) => {
   lines.push("ACTIONS:");
   for (const action of actions) {
     const status = action.available ? "" : ` (unavailable${action.unavailableReason ? `: ${action.unavailableReason}` : ""})`;
-    lines.push(`  ${action.name}${status}: ${action.description}`);
+    lines.push(`  ${action.name}${status}: ${action.describe}`);
     if (action.input?.length) {
       lines.push("    input: " + action.input.map((f) => `${f.name}:${f.type}${f.required === false ? "?" : ""}`).join(", "));
     }

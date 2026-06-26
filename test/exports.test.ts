@@ -11,7 +11,7 @@ test("root export surface is exactly the curated public API", async () => {
     "xml", "showIf", "raw",
     "ActionFailure",
     "skep",
-    "action", "booleanInput", "cell", "numberInput", "registerCell", "stringInput",
+    "action", "cell", "cellKit", "registerCell", "text", "num", "flag", "optional",
   ].sort();
   const actual = Object.keys(mod).filter((k) => k !== "default").sort();
   assert.deepEqual(actual, expected, "root exports match the curated list");

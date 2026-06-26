@@ -9,7 +9,7 @@ A bee is the only actor. A queen, a scout, a worker — all bees. A bee carries:
 
 - a **goal** — the self-contained brief it exists to satisfy,
 - a **mind** — how it decides (its policy),
-- **capabilities** — a set of strings gating which actions it may take,
+- **keys** — the locks it can open (which actions it gets to see),
 - and, as it runs: a local log, child bees, and eventually a result.
 
 There is no separate "queen type" or "orchestrator class." The queen is simply the first
@@ -24,16 +24,15 @@ state for that visit.
 
 ```ts
 const folder = cell("fs.folder", {
-  setup: (input) => loadFolder(input),
-  content: (state) => xml`<folder path="${state.path}">…</folder>`,
-  actions: () => [ /* grep, open_file, … */ ],
+  enter: (input) => loadFolder(input),
+  show: (state) => xml`<folder path="${state.path}">…</folder>`,
+  does: { grep, open_file /* … action cards … */ },
 });
 ```
 
-Actions declare what they `require`; a bee only sees an action whose capabilities it
-carries. Two different bees can walk into the same cell and see different action lists. The
-runtime injects a `resolve` action into every cell, so a bee can always finish — you never
-write it.
+Each action declares its `locks`; a bee only sees an action whose locks its keys can open.
+Two different bees can walk into the same cell and see different action lists. The runtime
+injects a `resolve` action into every cell, so a bee can always finish — you never write it.
 
 ## Mind
 
@@ -53,13 +52,14 @@ summary" step; the bee writes it in the same breath it chooses `resolve`.
 `llmMind()` is a ready-made policy backed by an LLM. A mock is just an object with a
 `decide`. Because the mind lives *on the bee*, different bees can think with different models.
 
-## Capabilities
+## Locks & keys
 
-Permissions are a set of strings, nothing more. A cell's action lists `requires: ["write"]`;
-a bee carries `["read"]` or `["read", "write"]`. An action is visible iff the bee carries
-its requirements. `scout` and `worker` are just presets (`scout → ["read"]`,
-`worker → ["read", "write"]`); define your own via `beeTypes`. That set-membership check
-*is* the entire permission system.
+Governance is lock-and-key, nothing more. An action declares `locks: ["write"]`; a bee
+carries `keys` (`["read"]`, or `["read", "write"]`). A bee sees a door iff its keys open
+*every* lock (AND). `scout` and `worker` are just key presets (`scout → ["read"]`,
+`worker → ["read", "write"]`); define your own via `beeTypes`. That set-membership check —
+locks ⊆ keys — *is* the entire permission system. (Need "any of"? Mint a key both roles
+carry and lock the door with that one key.)
 
 ## Spawning, and the ancestor contract
 

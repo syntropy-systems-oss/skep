@@ -24,7 +24,7 @@ test("queen dispatches a scout, which opens a file, and the answer bubbles up", 
 
   const events: RunEvent[] = [];
   const hive = skep({
-    cells: [registerCell(folderCell(), { root, path: "." }, { description: "Inspect the test repo", as: "scout" })],
+    cells: [registerCell(folderCell(), { root, path: "." }, { describe: "Inspect the test repo", as: "scout" })],
     mind: mockMind(),
   });
 
@@ -50,6 +50,6 @@ test("a read-only scout never runs a write action (none exist here, but the gate
   });
   const comb = await hive.run("Where is the dashboard icon defined?");
 
-  // The dispatched bee carried scout capabilities (read only).
-  assert.deepEqual(comb.queen.children[0].capabilities, ["read"]);
+  // The dispatched bee carried only the scout key (read).
+  assert.deepEqual(comb.queen.children[0].keys, ["read"]);
 });

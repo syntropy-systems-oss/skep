@@ -46,7 +46,14 @@ test("llmMind: a custom fetch lets the model be driven without a network", async
   const decision = await mind.decide({
     bee: null as any,
     view: "CELL",
-    actions: [{ name: "resolve", description: "finish", input: [{ name: "outcome", type: "string" }, { name: "summary", type: "string" }], available: true, example: {} }],
+    actions: [{
+      name: "resolve",
+      describe: "finish",
+      locks: [],
+      input: [{ name: "outcome", type: "string", required: true }, { name: "summary", type: "string", required: true }],
+      available: true,
+      example: {},
+    }],
   });
   assert.deepEqual(decision, { action: "resolve", args: { outcome: "succeeded", summary: "ok" } });
 });

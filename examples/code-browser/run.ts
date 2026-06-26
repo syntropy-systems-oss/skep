@@ -63,7 +63,7 @@ async function main() {
   };
 
   const hive = skep({
-    cells: [registerCell(folderCell(), { root: repoRoot, path: "." }, { description: "Inspect the repository from its root folder.", as: "scout" })],
+    cells: [registerCell(folderCell(), { root: repoRoot, path: "." }, { describe: "Inspect the repository from its root folder.", as: "scout" })],
     mind: mockMode ? mockMind() : llmMind({ onRaw: (raw, d) => { if (!d) console.log("   ⚠ unparsed:", raw.slice(0, 110)); } }),
   });
 

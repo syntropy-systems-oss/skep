@@ -77,6 +77,10 @@ Pushing Conventional Commits to `main` maintains a release PR that bumps the ver
 (`package.json` + `.release-please-manifest.json`) and updates `CHANGELOG.md`; merging that
 PR tags the release. Don't hand-edit the version or changelog.
 
+Each release gets a bee-themed **codename**. Add an entry to `codenames.json` (e.g.
+`"0.2.0": "Forage"`) — the release workflow titles the GitHub release with it. Pick a name
+that matches what the release is about.
+
 Publishing to npm is a separate, deliberate step (not yet automated):
 
 ```bash

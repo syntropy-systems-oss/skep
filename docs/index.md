@@ -36,7 +36,7 @@ that interface deliberate:
 ## The whole model, on one page
 
 There is one actor: the **bee**. It carries a **goal**, a **mind** (its policy: decide
-observation → action), and a set of **capabilities**. The **queen** is just the root bee.
+observation → action), and a set of **keys**. The **queen** is just the root bee.
 
 ```ts
 import { skep, registerCell } from "@syntropy-systems/skep";
@@ -53,7 +53,7 @@ comb.result;          // the takeaway: { outcome, summary }
 comb.queen.children;  // the tree of bees that wove it
 ```
 
-- **Cell** — a reusable room: renders content, offers capability-gated actions.
+- **Cell** — a reusable room: renders content, offers lock-gated actions.
 - **Bee** — an actor in a cell, pursuing a goal; it can spawn child bees into other cells.
 - **Mind** — one method, `decide`; the bee's policy. `llmMind()` is a ready-made one.
 - **Comb** — what a run weaves: the queen and her tree of bees.
@@ -64,4 +64,4 @@ runtime dependencies**.
 ## Next
 
 - [Getting started](getting-started.md) — install it and run your first skep.
-- [The model](the-model.md) — bees, cells, minds, capabilities, and the comb in depth.
+- [The model](the-model.md) — bees, cells, minds, locks & keys, and the comb in depth.

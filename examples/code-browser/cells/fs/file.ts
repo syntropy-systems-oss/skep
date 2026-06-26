@@ -1,69 +1,61 @@
-import { action, cell, numberInput, showIf, stringInput, xml, type Cell } from "@syntropy-systems/skep";
-import {
-  FileInput,
-  FileState,
-  GREP_CAP,
-  HEAD_LINES,
-  loadFile,
-  makeMatcher,
-} from "./helpers.ts";
+import { cell, cellKit, num, optional, showIf, text, xml, type Cell } from "@syntropy-systems/skep";
+import { FileInput, FileState, GREP_CAP, HEAD_LINES, loadFile, makeMatcher } from "./helpers.ts";
 
+const k = cellKit<FileState>();
+
+// ── state ──
+const enter = (input: FileInput): FileState => loadFile(input);
+
+// ── show ──
+const show = (s: FileState) => {
+  const start = Math.max(1, s.window.start);
+  const end = Math.min(s.lines.length, s.window.end);
+  const visible = s.lines.slice(start - 1, end);
+  return xml`
+    <file path="${s.path}" lines="${s.lines.length}" window="${start}..${end}">
+      ${showIf(s.error, xml`<error>${s.error ?? ""}</error>`)}
+      <window>${visible.map((line, i) => xml`<line n="${start + i}">${line}</line>`)}</window>
+      ${showIf(s.search, xml`
+        <search text="${s.search?.text ?? ""}" capped="${s.search?.capped ? "true" : "false"}">
+          ${(s.search?.hits ?? []).map((hit) => xml`<hit line="${hit.line}">${hit.text}</hit>`)}
+        </search>
+      `)}
+    </file>
+  `;
+};
+
+// ── does ──
+const search = k.action({
+  describe: "Search within this file and surface matching lines.",
+  input: { query: text("text or regex to search for") },
+  run: ({ query }, ctx) => {
+    const match = makeMatcher(query);
+    const hits = ctx.state.lines
+      .map((line, i) => ({ line: i + 1, text: line.trim() }))
+      .filter((h) => match(h.text))
+      .slice(0, GREP_CAP);
+    ctx.update({ search: { text: query, hits, capped: hits.length >= GREP_CAP } });
+    ctx.observe(hits.length ? `search "${query}" found ${hits.length} hit(s) in ${ctx.state.path}.` : `search "${query}" found no matches in ${ctx.state.path}.`);
+  },
+});
+
+const window = k.action({
+  describe: "Move the visible line window.",
+  input: { start: num("first line"), end: optional(num("last line")) },
+  run: ({ start, end }, ctx) => {
+    const first = Math.max(1, start);
+    const last = Math.min(ctx.state.lines.length, end ?? first + HEAD_LINES - 1);
+    ctx.update({ window: { start: first, end: Math.max(first, last) } });
+    ctx.observe(`showing ${ctx.state.path} lines ${first}..${Math.max(first, last)}.`);
+  },
+});
+
+// ── assembly ──
 export function fileCell(): Cell<FileState, FileInput> {
   return cell<FileState, FileInput>("fs.file", {
-    description: "Inspect a single file through windows and searches.",
-    setup: (input) => loadFile(input),
-    content: (state) => {
-      const start = Math.max(1, state.window.start);
-      const end = Math.min(state.lines.length, state.window.end);
-      const visible = state.lines.slice(start - 1, end);
-      return xml`
-        <file path="${state.path}" lines="${state.lines.length}" window="${start}..${end}">
-          ${showIf(state.error, xml`<error>${state.error ?? ""}</error>`)}
-          <window>
-            ${visible.map((line, index) => xml`<line n="${start + index}">${line}</line>`)}
-          </window>
-          ${showIf(state.search, xml`
-            <search text="${state.search?.text ?? ""}" capped="${state.search?.capped ? "true" : "false"}">
-              ${(state.search?.hits ?? []).map((hit) => xml`<hit line="${hit.line}">${hit.text}</hit>`)}
-            </search>
-          `)}
-        </file>
-      `;
-    },
-    actions: () => [
-      action<FileState>(
-        "search",
-        {
-          description: "Search within this file and update the file cell with matching lines.",
-          input: [stringInput("text", "Text or regex to search for")],
-        },
-        async ({ text }, ctx) => {
-          const query = String(text);
-          const match = makeMatcher(query);
-          const hits = ctx.state.lines
-            .map((line, index) => ({ line: index + 1, text: line.trim() }))
-            .filter((item) => match(item.text))
-            .slice(0, GREP_CAP);
-          ctx.update({ search: { text: query, hits, capped: hits.length >= GREP_CAP } });
-          ctx.observe(hits.length ? `search "${query}" found ${hits.length} hit(s) in ${ctx.state.path}.` : `search "${query}" found no matches in ${ctx.state.path}.`);
-        },
-      ),
-      action<FileState>(
-        "show",
-        {
-          description: "Change the visible line window for this file cell.",
-          input: [
-            numberInput("start", "First line to show"),
-            numberInput("end", "Last line to show", false),
-          ],
-        },
-        async ({ start, end }, ctx) => {
-          const first = Math.max(1, Number(start));
-          const last = Math.min(ctx.state.lines.length, Number(end ?? first + HEAD_LINES - 1));
-          ctx.update({ window: { start: first, end: Math.max(first, last) } });
-          ctx.observe(`showing ${ctx.state.path} lines ${first}..${Math.max(first, last)}.`);
-        },
-      ),
-    ],
+    describe: "Inspect a single file through windows and searches.",
+    enter,
+    show,
+    does: { search, window },
   });
 }

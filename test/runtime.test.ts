@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { action, cell, stringInput, type ActionView, type Cell, type Mind } from "../src/framework/index.ts";
+import { cell, cellKit, text, type ActionView, type Cell, type Mind } from "../src/framework/index.ts";
 import { makeBee, runBee, type RunEnv } from "../src/framework/runtime.ts";
 import { tuiRenderer } from "../src/framework/renderers/tui.ts";
 
@@ -8,22 +8,23 @@ const ROOT_GOAL = "find the thing";
 const CHILD_GOAL = "inspect deeper for the thing";
 
 type S = { name: string };
+const k = cellKit<S>();
 
 const mockCell: Cell<S, S> = cell<S, S>("mock.cell", {
-  setup: (input) => input,
-  content: (state) => `<mock name="${state.name}" />`,
-  actions: () => [
-    action<S>("look", { description: "look around" }, async (_args, ctx) => {
-      ctx.observe(`looked at ${ctx.state.name}`);
+  enter: (input) => input,
+  show: (s) => `<mock name="${s.name}" />`,
+  does: {
+    look: k.action({ describe: "look around", run: (_args, ctx) => ctx.observe(`looked at ${ctx.state.name}`) }),
+    scribble: k.action({ describe: "write something", locks: ["write"], run: (_args, ctx) => ctx.observe("scribbled") }),
+    descend: k.action({
+      describe: "send a child bee",
+      input: { goal: text("child goal") },
+      run: async ({ goal }, ctx) => {
+        const result = await ctx.spawn(mockCell, { name: "child" }, goal);
+        ctx.observe(`child returned ${result.outcome}`);
+      },
     }),
-    action<S>("scribble", { description: "write something", requires: ["write"] }, async (_args, ctx) => {
-      ctx.observe("scribbled");
-    }),
-    action<S>("descend", { description: "send a child bee", input: [stringInput("goal", "child goal")] }, async ({ goal }, ctx) => {
-      const result = await ctx.spawn(mockCell, { name: "child" }, String(goal));
-      ctx.observe(`child returned ${result.outcome}`);
-    }),
-  ],
+  },
 });
 
 const env = (over: Partial<RunEnv> = {}): RunEnv => ({
@@ -33,12 +34,12 @@ const env = (over: Partial<RunEnv> = {}): RunEnv => ({
   ...over,
 });
 
-test("capabilities gate which actions a bee can see", async () => {
+test("locks gate which actions a bee can see", async () => {
   const seen: Record<string, ActionView | undefined> = {};
   const probe = (key: string): Mind => ({
     async decide({ actions }) {
       seen[key] = actions.find((a) => a.name === "scribble");
-      assert.ok(actions.some((a) => a.name === "resolve" && a.available), "resolve is injected and available");
+      assert.ok(actions.some((a) => a.name === "resolve" && a.available), "resolve is injected");
       return { action: "resolve", args: { outcome: "succeeded", summary: "done" } };
     },
   });
@@ -46,9 +47,9 @@ test("capabilities gate which actions a bee can see", async () => {
   await runBee(makeBee(ROOT_GOAL, ["read"], probe("scout")), mockCell, { name: "root" }, [], env());
   await runBee(makeBee(ROOT_GOAL, ["read", "write"], probe("worker")), mockCell, { name: "root" }, [], env());
 
-  assert.equal(seen.scout?.available, false, "read-only bee cannot run the write action");
-  assert.match(seen.scout?.unavailableReason ?? "", /requires write/);
-  assert.equal(seen.worker?.available, true, "worker bee can run the write action");
+  assert.equal(seen.scout?.available, false, "a bee without the write key can't open the write-locked action");
+  assert.match(seen.scout?.unavailableReason ?? "", /write/);
+  assert.equal(seen.worker?.available, true, "a bee carrying the write key can");
 });
 
 test("a child sees ancestor + own goal, not the parent's notes; results bubble up", async () => {
@@ -72,10 +73,10 @@ test("a child sees ancestor + own goal, not the parent's notes; results bubble u
   const result = await runBee(root, mockCell, { name: "root" }, [], env());
 
   assert.equal(result.outcome, "succeeded");
-  assert.equal(root.children.length, 1, "root spawned one child");
-  assert.equal(root.children[0].result?.outcome, "not_found", "child result bubbled up");
-  assert.equal(root.children[0].localLog.length, 0, "child kept its own (empty) log");
-  assert.ok(root.localLog.some((e) => e.text.includes("looked at root")), "root kept its own note");
+  assert.equal(root.children.length, 1);
+  assert.equal(root.children[0].result?.outcome, "not_found");
+  assert.equal(root.children[0].localLog.length, 0);
+  assert.ok(root.localLog.some((e) => e.text.includes("looked at root")));
 
   assert.ok(childView.includes(ROOT_GOAL), "child view shows the ancestor goal");
   assert.ok(childView.includes(CHILD_GOAL), "child view shows its own goal");
@@ -92,7 +93,7 @@ test("repeating the same action with the same input is caught", async () => {
   };
   const root = makeBee(ROOT_GOAL, ["read"], mind);
   await runBee(root, mockCell, { name: "root" }, [], env());
-  assert.ok(root.localLog.some((e) => e.text.includes("repeated")), "the loop is flagged");
+  assert.ok(root.localLog.some((e) => e.text.includes("repeated")));
 });
 
 test("hitting the step cap yields a blocked result", async () => {
@@ -104,13 +105,13 @@ test("hitting the step cap yields a blocked result", async () => {
 
 test("a cell that defines a reserved 'resolve' action is rejected", async () => {
   const bad = cell<S, S>("bad.cell", {
-    setup: (input) => input,
-    content: () => "",
-    actions: () => [action<S>("resolve", { description: "shadows the injected resolve" }, async () => {})],
+    enter: (input) => input,
+    show: () => "",
+    does: { resolve: k.action({ describe: "shadows the injected resolve", run: () => {} }) },
   });
   const mind: Mind = { async decide() { return { action: "resolve", args: { outcome: "succeeded", summary: "x" } }; } };
   await assert.rejects(
     () => runBee(makeBee(ROOT_GOAL, ["read"], mind), bad, { name: "root" }, [], env()),
-    /reserved action name "resolve"/,
+    /reserved action "resolve"/,
   );
 });
