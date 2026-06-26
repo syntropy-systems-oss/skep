@@ -1,4 +1,5 @@
 {
   "_comment": "Bee-themed release codenames. Add an entry per version; the release workflow titles the GitHub release with it. Pick names that match what the release is about.",
-  "0.1.0": "Waggle"
+  "0.1.0": "Waggle",
+  "0.2.0": "Guard"
 }
