@@ -1,0 +1,68 @@
+{
+  "name": "@syntropy-systems/skep",
+  "version": "0.0.0",
+  "description": "A queen/bee runtime for agent cells and actions.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "./dist/framework/index.js",
+  "module": "./dist/framework/index.js",
+  "types": "./dist/framework/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/framework/index.d.ts",
+      "import": "./dist/framework/index.js",
+      "default": "./dist/framework/index.js"
+    },
+    "./renderers/tui": {
+      "types": "./dist/framework/renderers/tui.d.ts",
+      "import": "./dist/framework/renderers/tui.js",
+      "default": "./dist/framework/renderers/tui.js"
+    },
+    "./renderers/briefing": {
+      "types": "./dist/framework/renderers/briefing.d.ts",
+      "import": "./dist/framework/renderers/briefing.js",
+      "default": "./dist/framework/renderers/briefing.js"
+    },
+    "./debug/tui": {
+      "types": "./dist/framework/debug/tui.d.ts",
+      "import": "./dist/framework/debug/tui.js",
+      "default": "./dist/framework/debug/tui.js"
+    },
+    "./agents/llm": {
+      "types": "./dist/agents/llm.d.ts",
+      "import": "./dist/agents/llm.js",
+      "default": "./dist/agents/llm.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "esbuild src/framework/index.ts src/framework/renderers/tui.ts src/framework/renderers/briefing.ts src/framework/debug/tui.ts src/agents/llm.ts --bundle --format=esm --platform=node --target=node20 --packages=external --outbase=src --outdir=dist && tsc -p tsconfig.json && node scripts/fix-dts-extensions.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:consumer": "tsc -p tsconfig.consumer.json",
+    "prepare": "npm run build",
+    "verify": "npm run build && npm run typecheck && npm run typecheck:consumer && node --import tsx --test test/*.test.ts",
+    "test": "npm run build && node --import tsx --test test/*.test.ts",
+    "test:watch": "node --import tsx --test --watch test/*.test.ts",
+    "run": "npm run build && tsx examples/code-browser/run.ts",
+    "run:mock": "npm run build && tsx examples/code-browser/run.ts --mock",
+    "tui": "npm run build && tsx examples/code-browser/run.ts --tui --mock",
+    "tui:llm": "npm run build && tsx examples/code-browser/run.ts --tui"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "esbuild": "^0.28.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
