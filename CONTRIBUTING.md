@@ -81,12 +81,9 @@ Each release gets a bee-themed **codename**. Add an entry to `codenames.json` (e
 `"0.2.0": "Forage"`) — the release workflow titles the GitHub release with it. Pick a name
 that matches what the release is about.
 
-Publishing to npm is a separate, deliberate step (not yet automated):
+Publishing is automated: when Release Please cuts a release, the workflow publishes to npm
+via **OIDC trusted publishing** (no token — GitHub's OIDC proves the build, and provenance
+is attached automatically). The trusted publisher is configured on npm for this repo +
+`release-please.yml`. So a full release is just: merge the Release Please PR.
 
-```bash
-npm run verify
-npm publish --access public
-```
-
-The `@syntropy-systems` npm scope must grant publish access. When ready to ship on every
-release, add an `npm publish` step to the release workflow gated on `release_created`.
+Tests run in CI (`ci.yml`) on every push and PR via `npm run verify`.
