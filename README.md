@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/logo-dark.svg">
+    <img alt="Skep" src="./assets/logo-light.svg" width="120" height="120">
+  </picture>
+</p>
+
 # Skep
 
 Skep is a small framework for agent runs built from one idea: **everything is a bee.**
