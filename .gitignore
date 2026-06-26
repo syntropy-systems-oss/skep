@@ -1,2 +1,7 @@
 node_modules/
 dist/
+
+# MkDocs / docs tooling
+site/
+.venv/
+__pycache__/

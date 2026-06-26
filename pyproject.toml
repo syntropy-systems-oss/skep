@@ -1,0 +1,15 @@
+# This project is a Node package (@syntropy-systems/skep). This pyproject exists ONLY to
+# build the documentation site with MkDocs via uv (`uv run --group docs mkdocs ...`),
+# mirroring the Wind Tunnel docs setup. It is not published and does not affect the package.
+[project]
+name = "skep-docs"
+version = "0"
+description = "Documentation build for @syntropy-systems/skep"
+requires-python = ">=3.11"
+
+[dependency-groups]
+docs = [
+    # mkdocs pinned <2: the 2.0 rewrite breaks the plugin/theming ecosystem; material 9.x targets 1.x.
+    "mkdocs>=1.6,<2",
+    "mkdocs-material>=9.5",
+]

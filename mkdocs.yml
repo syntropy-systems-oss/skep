@@ -1,0 +1,41 @@
+site_name: Skep
+site_description: "A queen/bee agent framework — space as the agent's workspace."
+site_url: https://syntropy-systems-oss.github.io/skep/
+repo_url: https://github.com/syntropy-systems-oss/skep
+repo_name: syntropy-systems-oss/skep
+
+theme:
+  name: material
+  logo: assets/logo-dark.svg
+  favicon: assets/logo-light.svg
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: black
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.footer
+    - content.code.copy
+    - search.suggest
+
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - The model: the-model.md
