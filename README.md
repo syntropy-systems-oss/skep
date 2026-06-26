@@ -186,11 +186,15 @@ OPENAI_BASE_URL=https://api.openai.com/v1 OPENAI_API_KEY=sk-... SKEP_MODEL=gpt-4
 ## Security & sandboxing
 
 The runtime executes whatever its cells expose — filesystem, shell, network — with **no
-built-in permission system beyond lock-and-key actions.** When you run an agent
-against untrusted input or in an autonomous loop, the *process boundary* is your security
-boundary. The included `Dockerfile` shows a locked-down pattern (`--cap-drop ALL`,
-`--read-only`, `--security-opt no-new-privileges`, no docker socket). See
-[SECURITY.md](./SECURITY.md).
+built-in permission system beyond lock-and-key actions.** Keys only ever *attenuate*: a bee
+can only spawn children with a subset of its own keys, so privilege can't escalate down the
+tree. Cross-cutting request data (user id, auth, tenant) rides in **run context** —
+`run(prompt, { context })`, immutable, readable by every bee as `ctx.context`.
+
+Still: when you run an agent against untrusted input or in an autonomous loop, the *process
+boundary* is your real security boundary. The included `Dockerfile` shows a locked-down
+pattern (`--cap-drop ALL`, `--read-only`, `--security-opt no-new-privileges`, no docker
+socket). See [SECURITY.md](./SECURITY.md).
 
 ## Development
 

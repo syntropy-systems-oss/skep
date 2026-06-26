@@ -31,6 +31,7 @@ export type {
   CellRegistration,
   Comb,
   Content,
+  Context,
   DecideContext,
   Decision,
   Does,

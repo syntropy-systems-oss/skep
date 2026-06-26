@@ -38,8 +38,8 @@ const open_folder = k.action({
   input: { target: text("folder name or path"), goal: text("self-contained goal for the bee") },
   run: async ({ target, goal }, ctx) => {
     const path = resolveRel(ctx.state.root, ctx.state.path, target);
-    const result = await ctx.spawn(folderCell(), { root: ctx.state.root, path }, goal);
-    ctx.observe(`Folder bee returned [${result.outcome}] ${result.summary}`);
+    // The child's result lands in this bee's view (childResults) — no need to re-narrate it.
+    await ctx.spawn(folderCell(), { root: ctx.state.root, path }, goal);
   },
 });
 
@@ -48,8 +48,7 @@ const open_file = k.action({
   input: { target: text("file name or path"), goal: text("self-contained goal for the bee") },
   run: async ({ target, goal }, ctx) => {
     const path = resolveRel(ctx.state.root, ctx.state.path, target);
-    const result = await ctx.spawn(fileCell(), { root: ctx.state.root, path }, goal);
-    ctx.observe(`File bee returned [${result.outcome}] ${result.summary}`);
+    await ctx.spawn(fileCell(), { root: ctx.state.root, path }, goal);
   },
 });
 

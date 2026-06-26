@@ -69,9 +69,15 @@ export type ArgsOf<I extends InputSchema> = Prettify<
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
+// Run-level context: immutable, set once at run(), readable by every bee in the comb and
+// inherited by spawned bees. The seam for cross-cutting request data — user id, auth,
+// tenant, trace id. (Typed-generic context is an open roadmap question; untyped for now.)
+export type Context = Record<string, unknown>;
+
 export interface ActionContext<S> {
   bee: Bee;
   readonly state: S;
+  readonly context: Context;
   update(patch: Partial<S> | ((state: S) => S)): void;
   observe(text: string): void;
   spawn<I>(cell: Cell<any, I>, input: I, goal: string, opts?: SpawnOptions): Promise<GoalResult>;
@@ -166,5 +172,6 @@ export type RunEvent =
 export interface RunOptions {
   budget?: number;
   maxSteps?: number;
+  context?: Context; // immutable, read by every bee as ctx.context
   onEvent?: (e: RunEvent) => void;
 }

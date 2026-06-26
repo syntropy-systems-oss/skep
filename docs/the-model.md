@@ -61,6 +61,11 @@ carries `keys` (`["read"]`, or `["read", "write"]`). A bee sees a door iff its k
 locks ⊆ keys — *is* the entire permission system. (Need "any of"? Mint a key both roles
 carry and lock the door with that one key.)
 
+**Power only attenuates.** A bee can only spawn children whose keys are a subset of its own
+— a read-only bee cannot spawn a write bee. Escalation fails closed (the child is never
+created). The queen holds every key, so she can dispatch anything; everyone downstream can
+only narrow. If a sub-task needs more power, the queen has to be the one to grant it.
+
 ## Spawning, and the ancestor contract
 
 A bee goes deeper by **spawning** a child into another cell with an explicit goal:
@@ -96,6 +101,22 @@ comb.budgetUsed;
 A result is intentionally small — an `outcome` (`succeeded | partial | not_found | blocked
 | failed`) and a `summary`. The detail lives in the cells the bees visited; only the
 takeaway crosses a boundary.
+
+## Run context
+
+Cell state is the *room's* working data. Cross-cutting request data — `userId`, auth,
+tenant, a trace id — is different: it belongs to the whole run, not one cell. That's **run
+context**: set once at `run()`, **immutable**, readable by every bee as `ctx.context`, and
+inherited down the comb automatically.
+
+```ts
+await hive.run(prompt, { context: { userId, tenant, auth } });
+// in any action:
+run: (args, ctx) => { authorize(ctx.context.auth); }
+```
+
+It's read-only on purpose — a bee should never mutate the caller's identity. (Cell state is
+where mutable, per-visit data lives; context is the ambient environment the comb runs in.)
 
 ## The interface is swappable
 

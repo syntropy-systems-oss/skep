@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cell, cellKit, text, type ActionView, type Cell, type Mind } from "../src/framework/index.ts";
+import { cell, cellKit, text, type ActionView, type Cell, type Mind, type RunEvent } from "../src/framework/index.ts";
 import { makeBee, runBee, type RunEnv } from "../src/framework/runtime.ts";
 import { tuiRenderer } from "../src/framework/renderers/tui.ts";
 
@@ -30,6 +30,7 @@ const mockCell: Cell<S, S> = cell<S, S>("mock.cell", {
 const env = (over: Partial<RunEnv> = {}): RunEnv => ({
   renderer: tuiRenderer,
   beeTypes: { scout: ["read"], worker: ["read", "write"] },
+  context: {},
   maxSteps: 20,
   ...over,
 });
@@ -114,4 +115,64 @@ test("a cell that defines a reserved 'resolve' action is rejected", async () => 
     () => runBee(makeBee(ROOT_GOAL, ["read"], mind), bad, { name: "root" }, [], env()),
     /reserved action "resolve"/,
   );
+});
+
+test("a bee cannot spawn a child with keys it doesn't hold (attenuation)", async () => {
+  const escalator = cell<S, S>("escalator", {
+    enter: (input) => input,
+    show: () => "",
+    does: {
+      escalate: k.action({
+        describe: "try to spawn a write-capable bee from a read-only bee",
+        run: async (_args, ctx) => {
+          await ctx.spawn(mockCell, { name: "child" }, "child goal", { keys: ["read", "write"] });
+        },
+      }),
+    },
+  });
+  const events: RunEvent[] = [];
+  let n = 0;
+  const mind: Mind = {
+    async decide() {
+      n++;
+      return n === 1 ? { action: "escalate", args: {} } : { action: "resolve", args: { outcome: "blocked", summary: "done" } };
+    },
+  };
+  const root = makeBee(ROOT_GOAL, ["read"], mind); // read-only
+  await runBee(root, escalator, { name: "root" }, [], env({ onEvent: (e) => events.push(e) }));
+
+  assert.equal(root.children.length, 0, "the escalated child was never created");
+  assert.ok(events.some((e) => e.type === "error" && /exceed/.test(e.message)), "escalation fails loud");
+});
+
+test("run context is readable by every bee and inherited by children", async () => {
+  const seen: unknown[] = [];
+  type D = { depth: number };
+  const kd = cellKit<D>();
+  const reader: Cell<D, D> = cell<D, D>("reader", {
+    enter: (input) => input,
+    show: () => "",
+    does: {
+      peek: kd.action({
+        describe: "read the run context, then maybe go deeper",
+        run: async (_args, ctx) => {
+          seen.push(ctx.context.userId);
+          ctx.observe("peeked");
+          if (ctx.state.depth > 0) await ctx.spawn(reader, { depth: ctx.state.depth - 1 }, "deeper");
+        },
+      }),
+    },
+  });
+  const mind: Mind = {
+    async decide({ bee }) {
+      return bee.localLog.length === 0
+        ? { action: "peek", args: {} }
+        : { action: "resolve", args: { outcome: "succeeded", summary: "ok" } };
+    },
+  };
+
+  const root = makeBee("read it", ["read"], mind);
+  await runBee(root, reader, { depth: 1 }, [], env({ context: { userId: "u_123" } }));
+
+  assert.deepEqual(seen, ["u_123", "u_123"], "the root and its inherited child both saw the context");
 });

@@ -35,6 +35,7 @@ export function skep(config: SkepConfig): Skep {
       const env: RunEnv = {
         renderer,
         beeTypes,
+        context: opts.context ?? {},
         budget,
         maxSteps: opts.maxSteps ?? 50,
         onEvent: opts.onEvent,

@@ -4,6 +4,7 @@ import type {
   Bee,
   BeeView,
   Cell,
+  Context,
   Does,
   GoalResult,
   InputField,
@@ -52,6 +53,7 @@ const OUTCOMES = ["succeeded", "partial", "not_found", "blocked", "failed"] as c
 export interface RunEnv {
   renderer: Renderer;
   beeTypes: Record<string, string[]>;
+  context: Context;
   budget?: { remaining: number };
   maxSteps: number;
   onEvent?: (e: RunEvent) => void;
@@ -164,6 +166,7 @@ export async function runBee<S, I>(bee: Bee, cell: Cell<S, I>, input: I, ancesto
         get state() {
           return state;
         },
+        context: env.context,
         update: (patch: Partial<S> | ((s: S) => S)) => {
           state = (typeof patch === "function" ? patch(state as S) : { ...(state as any), ...patch }) as Awaited<S>;
         },
@@ -199,6 +202,12 @@ async function spawnChild<ChildInput>(
   env: RunEnv,
 ): Promise<GoalResult> {
   const keys = opts.keys ?? (opts.as ? env.beeTypes[opts.as] ?? [] : parent.keys);
+  // Capability attenuation: a bee can only spawn children with a subset of its own keys.
+  // Privilege escalation fails closed — the child is never created.
+  const escalated = keys.filter((key) => !parent.keys.includes(key));
+  if (escalated.length) {
+    failAction(`Cannot spawn a bee with keys [${keys.join(", ")}] — these exceed this bee's keys [${parent.keys.join(", ")}]: [${escalated.join(", ")}].`);
+  }
   const child = makeBee(goal, keys, opts.mind ?? parent.mind);
   parent.children.push(child);
   env.onEvent?.({ type: "spawn", parent, child, cell: childCell.id, goal });

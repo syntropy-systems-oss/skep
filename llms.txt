@@ -89,10 +89,18 @@ export const mailbox = cell<Mailbox, { name: string }>("mailbox", {
   `optional(field)`. The handler's args are typed from the schema.
 - **Locks are AND.** `locks: ["write", "audit"]` means a bee needs a key for *every* lock.
   Bees carry `keys`. Presets: `scout → ["read"]`, `worker → ["read", "write"]`.
+- **You can't escalate.** A bee may only spawn children whose keys are a subset of its own —
+  a read-only bee cannot spawn a write bee. The queen holds every key; power only attenuates
+  downward.
+- **`enter` takes a reference, not data.** `enter(input)` receives an id / path, and the cell
+  *loads* the real content. Never accept prefilled content — a model could fabricate it.
 - **Never write a `resolve` action** — the runtime injects it. To finish, call `resolve`
   with `{ outcome, summary }` (a cell that defines its own `resolve` is rejected).
-- **The only `ctx` verbs:** `ctx.state`, `ctx.update(patch)`, `ctx.observe(text)`,
-  `ctx.spawn(cell, input, goal, opts?)`, `ctx.resolve(result)`, `ctx.fail(message)`.
+- **The only `ctx` verbs:** `ctx.state`, `ctx.context` (read-only run context: user/auth/tenant),
+  `ctx.update(patch)`, `ctx.observe(text)`, `ctx.spawn(cell, input, goal, opts?)`,
+  `ctx.resolve(result)`, `ctx.fail(message)`.
+- **`observe` is for what you *did*, not what's already shown.** Don't re-narrate spawn
+  results (child results already appear in your view) or state you just `update`d.
 - **Keep handlers small.** Push real logic into helper functions. One room, one file.
 
 ## 4. Verify

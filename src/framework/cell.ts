@@ -95,8 +95,8 @@ export function entryCell(): Cell<EntryInput, EntryInput> {
           const reg = ctx.state.cells.find((candidate) => candidate.id === cellId);
           if (!reg) return ctx.fail(`Unknown cell "${cellId}".`);
           const beeType = as ?? reg.as ?? "scout";
-          const result = await ctx.spawn(reg.cell, reg.input, goal, { as: beeType });
-          ctx.observe(`Bee returned [${result.outcome}] ${result.summary}`);
+          // The dispatched bee's result lands in the queen's view (childResults).
+          await ctx.spawn(reg.cell, reg.input, goal, { as: beeType });
         },
       }),
     },
